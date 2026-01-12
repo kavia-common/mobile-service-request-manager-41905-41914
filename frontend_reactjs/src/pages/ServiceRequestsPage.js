@@ -5,30 +5,44 @@ import { RequestStatus } from "../domain/constants";
 import StatusBadge from "../components/StatusBadge";
 import { api } from "../services/apiClient";
 import { filterRequests, sortRequests } from "../utils/requests";
+import Breadcrumbs from "../components/ui/Breadcrumbs";
+import { useToast } from "../components/ui/ToastProvider";
 
 // PUBLIC_INTERFACE
 export default function ServiceRequestsPage() {
   /** Page showing request list with filtering/search/sorting and CRUD actions. */
   const nav = useNavigate();
+  const toast = useToast();
+
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All");
   const [sortKey, setSortKey] = useState("createdAtDesc");
+  const [refreshing, setRefreshing] = useState(false);
 
-  const refresh = async () => {
+  const refresh = async ({ silent } = {}) => {
+    if (!silent) setRefreshing(true);
     setLoading(true);
+    setLoadError("");
     try {
       const data = await api.listRequests();
       setRequests(Array.isArray(data) ? data : []);
+      if (!silent) toast.push({ title: "Updated", description: "Request list refreshed.", kind: "success" });
+    } catch (e) {
+      setLoadError(e?.message || "Failed to load requests.");
+      if (!silent) toast.push({ title: "Could not refresh", description: "Please try again.", kind: "error" });
     } finally {
       setLoading(false);
+      if (!silent) setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    refresh();
+    refresh({ silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filtered = useMemo(() => {
@@ -43,8 +57,13 @@ export default function ServiceRequestsPage() {
     // eslint-disable-next-line no-alert
     const ok = window.confirm("Delete this request? This cannot be undone.");
     if (!ok) return;
-    await api.deleteRequest(id);
-    await refresh();
+    try {
+      await api.deleteRequest(id);
+      toast.push({ title: "Deleted", description: `Request ${id} removed.`, kind: "success" });
+      await refresh({ silent: true });
+    } catch (e) {
+      toast.push({ title: "Delete failed", description: e?.message || "Please try again.", kind: "error" });
+    }
   };
 
   const counts = useMemo(() => {
@@ -60,19 +79,23 @@ export default function ServiceRequestsPage() {
 
   return (
     <div className="container">
+      <Breadcrumbs items={[{ label: "Service Requests" }]} />
+
       <div className="card">
         <div className="cardHeader">
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div>
               <h1 className="h1">Service Requests</h1>
               <p className="h2" style={{ marginTop: 6 }}>
-                {loading ? "Loading..." : `${counts.total} total · ${counts.open} open · ${counts.inProgress} in progress · ${counts.resolved} resolved · ${counts.closed} closed`}
+                {loading
+                  ? "Loading..."
+                  : `${counts.total} total · ${counts.open} open · ${counts.inProgress} in progress · ${counts.resolved} resolved · ${counts.closed} closed`}
               </p>
             </div>
 
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <button className="btn" onClick={refresh}>
-                Refresh
+              <button className="btn" onClick={() => refresh()} disabled={refreshing} aria-disabled={refreshing}>
+                {refreshing ? "Refreshing…" : "Refresh"}
               </button>
               <button className="btn btnPrimary" onClick={() => nav("/requests/new")}>
                 Create
@@ -82,10 +105,40 @@ export default function ServiceRequestsPage() {
         </div>
 
         <div className="cardBody">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 180px 200px", gap: 12, alignItems: "end" }}>
+          {loadError ? (
+            <div
+              className="banner"
+              role="alert"
+              style={{
+                background: "rgba(239, 68, 68, 0.08)",
+                borderColor: "rgba(239, 68, 68, 0.28)",
+                marginBottom: 12,
+              }}
+            >
+              <div>
+                <div className="bannerTitle">Could not load requests</div>
+                <div className="bannerDesc">{loadError}</div>
+              </div>
+              <button className="btn btnGhost" onClick={() => refresh()}>
+                Retry
+              </button>
+            </div>
+          ) : null}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 180px 200px",
+              gap: 12,
+              alignItems: "end",
+            }}
+          >
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "var(--ocean-muted)" }}>Search</label>
+              <label className="smallLabel" htmlFor="searchInput">
+                Search
+              </label>
               <input
+                id="searchInput"
                 className="input"
                 placeholder="Search by title, description, assignee, or ID…"
                 value={query}
@@ -94,8 +147,10 @@ export default function ServiceRequestsPage() {
             </div>
 
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "var(--ocean-muted)" }}>Status</label>
-              <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <label className="smallLabel" htmlFor="statusSelect">
+                Status
+              </label>
+              <select id="statusSelect" className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
                 <option value="All">All</option>
                 <option value={RequestStatus.OPEN}>{RequestStatus.OPEN}</option>
                 <option value={RequestStatus.IN_PROGRESS}>{RequestStatus.IN_PROGRESS}</option>
@@ -105,8 +160,10 @@ export default function ServiceRequestsPage() {
             </div>
 
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "var(--ocean-muted)" }}>Sort</label>
-              <select className="select" value={sortKey} onChange={(e) => setSortKey(e.target.value)}>
+              <label className="smallLabel" htmlFor="sortSelect">
+                Sort
+              </label>
+              <select id="sortSelect" className="select" value={sortKey} onChange={(e) => setSortKey(e.target.value)}>
                 <option value="createdAtDesc">Newest first</option>
                 <option value="createdAtAsc">Oldest first</option>
                 <option value="priorityDesc">Priority (high → low)</option>
@@ -130,7 +187,13 @@ export default function ServiceRequestsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: 16, color: "var(--ocean-muted)" }}>
+                      Loading requests…
+                    </td>
+                  </tr>
+                ) : sorted.length === 0 ? (
                   <tr>
                     <td colSpan={6} style={{ padding: 16, color: "var(--ocean-muted)" }}>
                       No requests match your filters.
@@ -139,19 +202,29 @@ export default function ServiceRequestsPage() {
                 ) : (
                   sorted.map((r) => (
                     <tr className="tableRow" key={r.id}>
-                      <td style={{ fontWeight: 800, letterSpacing: "-0.01em" }}>{r.id}</td>
+                      <td style={{ fontWeight: 900, letterSpacing: "-0.01em" }}>{r.id}</td>
                       <td>
-                        <div style={{ fontWeight: 800, letterSpacing: "-0.01em" }}>
+                        <div style={{ fontWeight: 900, letterSpacing: "-0.01em" }}>
                           <Link to={`/requests/${encodeURIComponent(r.id)}`}>{r.title}</Link>
                         </div>
-                        <div style={{ fontSize: 12, color: "var(--ocean-muted)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 520 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "var(--ocean-muted)",
+                            marginTop: 4,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            maxWidth: 520,
+                          }}
+                        >
                           {r.description}
                         </div>
                       </td>
                       <td>{r.assignee || <span style={{ color: "var(--ocean-muted)" }}>—</span>}</td>
                       <td>
-                        <span className="badge">
-                          <span className="badgeDot" aria-hidden="true" style={{ background: "rgba(245, 158, 11, 0.9)" }} />
+                        <span className="badge" aria-label={`Priority: ${r.priority}`}>
+                          <span className="badgeDot" aria-hidden="true" style={{ background: "rgba(245, 158, 11, 0.95)" }} />
                           {r.priority}
                         </span>
                       </td>
@@ -159,13 +232,13 @@ export default function ServiceRequestsPage() {
                         <StatusBadge status={r.status} />
                       </td>
                       <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button className="btn" onClick={() => nav(`/requests/${encodeURIComponent(r.id)}`)}>
+                        <button className="btn" onClick={() => nav(`/requests/${encodeURIComponent(r.id)}`)} aria-label={`View request ${r.id}`}>
                           View
                         </button>
-                        <button className="btn" onClick={() => nav(`/requests/${encodeURIComponent(r.id)}/edit`)}>
+                        <button className="btn" onClick={() => nav(`/requests/${encodeURIComponent(r.id)}/edit`)} aria-label={`Edit request ${r.id}`}>
                           Edit
                         </button>
-                        <button className="btn btnDanger" onClick={() => onDelete(r.id)}>
+                        <button className="btn btnDanger" onClick={() => onDelete(r.id)} aria-label={`Delete request ${r.id}`}>
                           Delete
                         </button>
                       </td>
@@ -179,6 +252,17 @@ export default function ServiceRequestsPage() {
           <div style={{ marginTop: 14, fontSize: 12, color: "var(--ocean-muted)" }}>
             Tip: local mode persists to <code>localStorage</code>. Refresh the page to verify persistence.
           </div>
+
+          {/* Stack filters for narrow screens */}
+          <style>
+            {`
+              @media (max-width: 860px) {
+                .cardBody > div[style*="grid-template-columns: 1fr 180px 200px"] {
+                  grid-template-columns: 1fr !important;
+                }
+              }
+            `}
+          </style>
         </div>
       </div>
     </div>

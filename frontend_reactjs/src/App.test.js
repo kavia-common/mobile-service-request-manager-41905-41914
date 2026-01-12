@@ -1,8 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import App from "./App";
 
-test("renders Service Requests page shell", () => {
+test("renders primary landmarks and key actions", () => {
   render(<App />);
-  expect(screen.getByText(/service requests/i)).toBeInTheDocument();
+
+  // Landmarks
+  expect(screen.getByRole("banner")).toBeInTheDocument();
+  expect(screen.getByRole("main", { name: /content/i })).toBeInTheDocument();
+
+  // Key actions
+  expect(screen.getByRole("button", { name: /open navigation menu/i })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /new request/i })).toBeInTheDocument();
+
+  // Page content
+  expect(screen.getByText(/service requests/i)).toBeInTheDocument();
 });

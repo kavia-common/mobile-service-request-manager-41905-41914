@@ -20,8 +20,10 @@ function classForStatus(status) {
 export default function StatusBadge({ status }) {
   /** Renders a consistent status badge for a request. */
   const cls = classForStatus(status);
+  const label = status ? `Status: ${status}` : "Status";
+
   return (
-    <span className={`badge ${cls}`}>
+    <span className={`badge ${cls}`} aria-label={label}>
       <span className="badgeDot" aria-hidden="true" />
       <span>{status}</span>
     </span>
