@@ -64,7 +64,9 @@ export function sortRequests(requests, sortKey) {
       case "priorityAsc":
         return priorityRank(a.priority) - priorityRank(b.priority);
       case "priorityDesc":
-        return priorityRank(b.priority) - priorityRank(a.priority);
+        // Lower rank means higher priority (Urgent=0 ... Low=3), so descending priority
+        // should sort by ascending rank.
+        return priorityRank(a.priority) - priorityRank(b.priority);
       case "statusAsc":
         return statusRank(a.status) - statusRank(b.status);
       case "titleAsc":

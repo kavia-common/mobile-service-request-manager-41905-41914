@@ -12,6 +12,6 @@ test("renders primary landmarks and key actions", () => {
   expect(screen.getByRole("button", { name: /open navigation menu/i })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /new request/i })).toBeInTheDocument();
 
-  // Page content
-  expect(screen.getByText(/service requests/i)).toBeInTheDocument();
+  // Page content (use a specific landmark to avoid ambiguous matches)
+  expect(screen.getByRole("heading", { name: /service requests/i })).toBeInTheDocument();
 });
