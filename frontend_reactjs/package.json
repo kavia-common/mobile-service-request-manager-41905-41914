@@ -12,8 +12,10 @@
     "react-scripts": "^5.0.1"
   },
   "scripts": {
+    "prestart": "node -e \"const fs=require('fs'); if(!fs.existsSync('node_modules')){console.log('[prestart] node_modules missing; running npm ci...'); require('child_process').execSync('npm ci --no-audit --no-fund',{stdio:'inherit'});} else {console.log('[prestart] node_modules present; skipping npm ci.');}\"",
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "pretest": "node -e \"const fs=require('fs'); if(!fs.existsSync('node_modules')){console.log('[pretest] node_modules missing; running npm ci...'); require('child_process').execSync('npm ci --no-audit --no-fund',{stdio:'inherit'});} else {console.log('[pretest] node_modules present; skipping npm ci.');}\"",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
